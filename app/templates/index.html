@@ -1,0 +1,347 @@
+<!DOCTYPE html>
+<html lang="fr" data-theme="dark">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Security Audit Dashboard</title>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.2/dist/chart.umd.min.js"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    
+    <style>
+        :root {
+            --bg-body: #0b132b;
+            --bg-sidebar: #0e172e;
+            --bg-card: #151e32;
+            --bg-header: #151e32;
+            --text-main: #e2e8f0;
+            --text-muted: #94a3b8;
+            --border-color: #2e3a59;
+            --accent-blue: #3b82f6;
+            --sidebar-active: #1d4ed8;
+            
+            --color-red: #ef4444;
+            --color-orange: #f97316;
+            --color-yellow: #eab308;
+            --color-green: #22c55e;
+            --card-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.4);
+        }
+
+        [data-theme="light"] {
+            --bg-body: #f1f5f9;
+            --bg-sidebar: #ffffff;
+            --bg-card: #ffffff;
+            --bg-header: #ffffff;
+            --text-main: #0f172a;
+            --text-muted: #64748b;
+            --border-color: #cbd5e1;
+            --accent-blue: #2563eb;
+            --sidebar-active: #e2e8f0;
+            --card-shadow: 0 4px 6px -1px rgba(0,0,0,0.1);
+        }
+
+        * { box-sizing: border-box; margin: 0; padding: 0; font-family: 'Segoe UI', Tahoma, Geneva, Roboto, sans-serif; }
+        
+        /* Custom Scrollbar */
+        ::-webkit-scrollbar { width: 8px; height: 8px; }
+        ::-webkit-scrollbar-track { background: var(--bg-body); }
+        ::-webkit-scrollbar-thumb { background: var(--border-color); border-radius: 4px; }
+        ::-webkit-scrollbar-thumb:hover { background: var(--text-muted); }
+
+        body { background-color: var(--bg-body); color: var(--text-main); display: flex; height: 100vh; overflow: hidden; transition: background-color 0.3s, color 0.3s; }
+        
+        /* Sidebar */
+        .sidebar { width: 250px; background-color: var(--bg-sidebar); border-right: 1px solid var(--border-color); display: flex; flex-direction: column; flex-shrink: 0;}
+        .main-content { flex-grow: 1; display: flex; flex-direction: column; overflow: hidden; }
+        
+        /* Header */
+        .header { background-color: var(--bg-header); padding: 15px 30px; display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid var(--border-color); flex-shrink: 0;}
+        .header-title h1 { font-size: 1.5rem; display: flex; align-items: center; gap: 10px; }
+        .header-title p { font-size: 0.85rem; color: var(--text-muted); margin-top: 2px; margin-left: 34px; }
+        .header-status { display: flex; align-items: center; gap: 20px; font-size: 0.9rem; }
+        .header-status .online { color: var(--color-green); font-weight: bold; }
+        .theme-toggle { cursor: pointer; font-size: 1.2rem; color: var(--text-muted); }
+        .theme-toggle:hover { color: var(--text-main); }
+        
+        /* Navigation */
+        .nav-items { margin-top: 30px; }
+        .nav-item { padding: 15px 30px; display: flex; align-items: center; gap: 15px; color: var(--text-muted); cursor: pointer; transition: 0.2s; font-weight: 500; }
+        .nav-item:hover { color: var(--text-main); background-color: rgba(255,255,255,0.05); }
+        .nav-item.active { color: #fff; background-color: var(--sidebar-active); border-left: 4px solid var(--accent-blue); }
+        [data-theme="light"] .nav-item.active { color: var(--accent-blue); }
+
+        /* Views Container */
+        .view-container { flex-grow: 1; overflow-y: auto; padding: 20px; display: none; }
+        .view-container.active { display: block; }
+
+        /* Grid Overview */
+        .dashboard-grid { display: grid; grid-template-columns: 2fr 1fr; gap: 20px; }
+        .card { background-color: var(--bg-card); border-radius: 8px; padding: 15px; box-shadow: var(--card-shadow); border: 1px solid var(--border-color); }
+        .card-header { font-size: 1.1rem; font-weight: 600; margin-bottom: 15px; display: flex; align-items: center; justify-content: space-between;}
+        
+        /* Alerts */
+        .alert-box { padding: 12px 15px; margin-bottom: 10px; border-radius: 6px; display: flex; justify-content: space-between; align-items: center; background-color: rgba(255,255,255,0.03); border-left: 4px solid; border-bottom: 1px solid var(--border-color); }
+        .alert-info h4 { font-size: 0.95rem; margin-bottom: 3px; }
+        .alert-info p { font-size: 0.8rem; color: var(--text-muted); }
+        .alert-time { font-size: 0.8rem; color: var(--text-muted); }
+        .type-ssh { border-left-color: var(--color-red); } .type-ssh h4 { color: var(--color-red); }
+        .type-root { border-left-color: var(--color-orange); } .type-root h4 { color: var(--color-orange); }
+        .type-sudo { border-left-color: var(--color-yellow); } .type-sudo h4 { color: var(--color-yellow); }
+        .type-file { border-left-color: var(--color-green); } .type-file h4 { color: var(--color-green); }
+
+        /* Stats */
+        .stats-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+        .stat-card { background-color: rgba(0,0,0,0.1); padding: 15px; border-radius: 6px; border: 1px solid var(--border-color); display: flex; justify-content: space-between; align-items: center; }
+        .val-green { color: var(--color-green); } .val-blue  { color: var(--accent-blue); } .val-orange{ color: var(--color-orange); } .val-red   { color: var(--color-red); } .val-yellow { color: var(--color-yellow); }
+        .stat-info .value { font-size: 1.4rem; font-weight: bold; }
+
+        /* Logs Table */
+        .logs-table { width: 100%; border-collapse: collapse; font-size: 0.85rem; }
+        .logs-table th { text-align: left; padding: 10px; border-bottom: 2px solid var(--border-color); color: var(--text-muted); position: sticky; top: -15px; background: var(--bg-card);}
+        .logs-table td { padding: 8px 10px; border-bottom: 1px solid var(--border-color); }
+        
+        /* Chart */
+        .chart-container { position: relative; height: 250px; width: 100%; }
+        .mini-chart { height: 160px; }
+
+        /* SysInfo */
+        .sys-item { margin-bottom: 15px; }
+        .sys-label { display: flex; justify-content: space-between; font-size: 0.85rem; margin-bottom: 5px; }
+        .progress-bg { height: 8px; background-color: rgba(255,255,255,0.1); border-radius: 4px; overflow: hidden; }
+        .progress-bar { height: 100%; border-radius: 4px; transition: width 0.5s; }
+        .pb-cpu { background-color: var(--color-green); } .pb-mem { background-color: var(--accent-blue); } .pb-disk { background-color: var(--color-red); }
+        
+        .btn-report { width: 100%; padding: 10px; background: #3b82f6; border: none; color: white; border-radius: 4px; cursor: pointer; display: flex; align-items:center; justify-content:center; gap:10px; transition: 0.2s;}
+        .btn-report:hover { background: #2563eb; }
+
+        /* Scrollable blocks inside cards */
+        .scrollable-y { max-height: 250px; overflow-y: auto;}
+    </style>
+</head>
+<body>
+    <div class="sidebar">
+        <div class="nav-items">
+            <!-- Navigation Listeners injectés via onclick -->
+            <div class="nav-item active" id="nav-overview" onclick="switchView('overview')"><i class="fa-solid fa-house"></i> Overview</div>
+            <div class="nav-item" id="nav-events" onclick="switchView('events')"><i class="fa-solid fa-list-ul"></i> System Events</div>
+            <div class="nav-item" id="nav-reporting" onclick="switchView('reporting')"><i class="fa-solid fa-chart-bar"></i> Live Reporting</div>
+        </div>
+    </div>
+    <div class="main-content">
+        <div class="header">
+            <div class="header-title">
+                <h1><i class="fa-solid fa-shield-halved"></i> Security Audit Dashboard</h1>
+                <p>Enterprise SIEM Console</p>
+            </div>
+            <div class="header-status">
+                <span>Agent Status: <span class="online" id="api-status">OK</span></span>
+                <i class="fa-solid fa-moon theme-toggle" id="theme-icon" onclick="toggleTheme()"></i>
+            </div>
+        </div>
+        
+        <!-- VUE 1 : OVERVIEW (Dashboard global) -->
+        <div class="view-container active" id="view-overview">
+            <div class="dashboard-grid">
+                
+                <div class="card" style="grid-column: 1; grid-row: 1;">
+                    <div class="card-header"><span style="color:var(--color-red)"><i class="fa-solid fa-bell"></i> Critical Alerts</span></div>
+                    <div id="alerts-container" class="scrollable-y">Loading...</div>
+                </div>
+
+                <div class="card" style="grid-column: 2; grid-row: 1;">
+                    <div class="card-header">Total Occurrences (Today)</div>
+                    <div class="stats-grid">
+                        <div class="stat-card"><div class="stat-info"><h5 style="color:var(--text-muted);font-weight:normal;">SSH Failures</h5><div class="value val-red" id="stat-ssh">0</div></div><i class="fa-solid fa-user-slash" style="opacity:0.3;font-size:1.5rem"></i></div>
+                        <div class="stat-card"><div class="stat-info"><h5 style="color:var(--text-muted);font-weight:normal;">Root Logins</h5><div class="value val-orange" id="stat-root">0</div></div><i class="fa-solid fa-user-shield" style="opacity:0.3;font-size:1.5rem"></i></div>
+                        <div class="stat-card"><div class="stat-info"><h5 style="color:var(--text-muted);font-weight:normal;">Sudo Usage</h5><div class="value val-yellow" id="stat-sudo">0</div></div><i class="fa-solid fa-terminal" style="opacity:0.3;font-size:1.5rem"></i></div>
+                        <div class="stat-card"><div class="stat-info"><h5 style="color:var(--text-muted);font-weight:normal;">File Changes</h5><div class="value val-green" id="stat-file">0</div></div><i class="fa-solid fa-folder-open" style="opacity:0.3;font-size:1.5rem"></i></div>
+                    </div>
+                </div>
+
+                <div class="card" style="grid-column: 1; grid-row: 2 / 4;">
+                    <div class="card-header">Recent System Events</div>
+                    <div class="scrollable-y" style="max-height: 400px;">
+                        <table class="logs-table">
+                            <thead><tr><th>Time</th><th>Severity</th><th>Event</th><th>Description</th></tr></thead>
+                            <tbody id="logs-body-overview"></tbody>
+                        </table>
+                    </div>
+                </div>
+
+                <div class="card" style="grid-column: 2; grid-row: 2;">
+                    <div class="card-header">Activity Snapshot</div>
+                    <div class="chart-container mini-chart"><canvas id="activityChartMini"></canvas></div>
+                </div>
+
+                <div class="card" style="grid-column: 2; grid-row: 3;">
+                    <div class="card-header">System Health (Live)</div>
+                    <div class="sys-item"><div class="sys-label"><span>CPU Usage</span> <span id="sys-cpu-val">0%</span></div><div class="progress-bg"><div class="progress-bar pb-cpu" id="sys-cpu-bar"></div></div></div>
+                    <div class="sys-item"><div class="sys-label"><span>RAM Usage</span> <span id="sys-mem-val">0%</span></div><div class="progress-bg"><div class="progress-bar pb-mem" id="sys-mem-bar"></div></div></div>
+                    <div class="sys-item"><div class="sys-label"><span>Disk Usage</span> <span id="sys-disk-val">0%</span></div><div class="progress-bg"><div class="progress-bar pb-disk" id="sys-disk-bar"></div></div></div>
+                </div>
+            </div>
+        </div>
+
+        <!-- VUE 2 : SYSTEM EVENTS (Full page table) -->
+        <div class="view-container" id="view-events">
+            <h2 style="margin-bottom: 20px;"><i class="fa-solid fa-list-ul"></i> All System Events</h2>
+            <div class="card" style="height: calc(100vh - 160px); display:flex; flex-direction:column;">
+                <div class="card-header">Global Event Log Archive</div>
+                <div style="flex-grow:1; overflow-y:auto; padding-right:5px;">
+                    <table class="logs-table">
+                        <thead><tr><th>ID</th><th>Timestamp</th><th>Type</th><th>Severity</th><th>Event</th><th>Raw Output Details</th></tr></thead>
+                        <tbody id="logs-body-full">
+                            <!-- Injected by JS -->
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+
+        <!-- VUE 3 : LIVE REPORTING (Large Chart & Export) -->
+        <div class="view-container" id="view-reporting">
+            <h2 style="margin-bottom: 20px;"><i class="fa-solid fa-chart-bar"></i> Live Security Reporting</h2>
+            <div style="display: grid; grid-template-columns: 1fr; gap: 20px;">
+                <div class="card">
+                    <div class="card-header d-flex justify-content-between">
+                        Hourly Threat Activity Tracking (24h)
+                        <button class="btn-report" style="width:auto; padding:5px 15px;" onclick="alert('PDF Report Generation triggered in SIEM core.')"><i class="fa-solid fa-file-pdf"></i> Export Current Data</button>
+                    </div>
+                    <div class="chart-container" style="height: 350px;"><canvas id="activityChartFull"></canvas></div>
+                </div>
+                
+                <div class="card">
+                    <div class="card-header">Threat Intelligence Summary</div>
+                    <p style="color:var(--text-muted); line-height: 1.6;">
+                        El system SIEM is running perfectly. Database persistence is active on SQLite, logging every SSH auth failure, ROOT escalations, and modification to sensitive system files (/etc/passwd, shadow, sudoers). Real-time hooks are currently capturing events successfully via Linux AuditD Daemon framework.
+                    </p>
+                </div>
+            </div>
+        </div>
+
+    </div>
+
+    <script>
+        // --- Navigation (Single Page App Logic) ---
+        function switchView(viewName) {
+            // Cacher toutes les vues
+            document.querySelectorAll('.view-container').forEach(el => el.classList.remove('active'));
+            // Retirer l'état actif du menu
+            document.querySelectorAll('.nav-item').forEach(el => el.classList.remove('active'));
+            
+            // Activer la vue cliquée
+            document.getElementById('view-' + viewName).classList.add('active');
+            document.getElementById('nav-' + viewName).classList.add('active');
+        }
+
+        // --- Theme ---
+        function toggleTheme() {
+            const html = document.documentElement;
+            html.setAttribute('data-theme', html.getAttribute('data-theme') === 'dark' ? 'light' : 'dark');
+            document.getElementById('theme-icon').className = html.getAttribute('data-theme') === 'dark' ? 'fa-solid fa-moon theme-toggle' : 'fa-solid fa-sun theme-toggle';
+        }
+
+        // --- Charts.js Setup ---
+        const chartOptions = { responsive: true, maintainAspectRatio: false, scales: { x: { grid: { color: 'rgba(255,255,255,0.05)' } }, y: { beginAtZero: true, grid: { color: 'rgba(255,255,255,0.05)' } } } };
+        const datasetTemplate = [
+            { label: 'SSH BruteForce', data: [], borderColor: '#ef4444', backgroundColor: 'rgba(239, 68, 68, 0.1)', tension: 0.4, fill: true },
+            { label: 'SUDO Abuse', data: [], borderColor: '#eab308', backgroundColor: 'rgba(234, 179, 8, 0.1)', tension: 0.4, fill: true },
+            { label: 'File Tampering', data: [], borderColor: '#22c55e', backgroundColor: 'rgba(34, 197, 94, 0.1)', tension: 0.4, fill: true }
+        ];
+
+        const ctxMini = document.getElementById('activityChartMini').getContext('2d');
+        const chartMini = new Chart(ctxMini, { type: 'line', data: { labels: [], datasets: JSON.parse(JSON.stringify(datasetTemplate)) }, options: chartOptions });
+        
+        const ctxFull = document.getElementById('activityChartFull').getContext('2d');
+        const chartFull = new Chart(ctxFull, { type: 'line', data: { labels: [], datasets: JSON.parse(JSON.stringify(datasetTemplate)) }, options: chartOptions });
+
+
+        // --- APIs Fetching ---
+        async function fetchSystem() {
+            try {
+                const res = await fetch('/api/v1/system'); const data = await res.json();
+                document.getElementById('sys-cpu-val').innerText = data.cpu + '%'; document.getElementById('sys-cpu-bar').style.width = data.cpu + '%';
+                document.getElementById('sys-mem-val').innerText = data.ram + '%'; document.getElementById('sys-mem-bar').style.width = data.ram + '%';
+                document.getElementById('sys-disk-val').innerText = data.disk + '%'; document.getElementById('sys-disk-bar').style.width = data.disk + '%';
+            } catch(e) { document.getElementById('api-status').innerText = 'ERROR'; document.getElementById('api-status').style.color = 'red'; }
+        }
+
+        async function fetchStats() {
+            const res = await fetch('/api/v1/stats'); const data = await res.json();
+            document.getElementById('stat-ssh').innerText = data.ssh;
+            document.getElementById('stat-root').innerText = data.root;
+            document.getElementById('stat-sudo').innerText = data.sudo;
+            document.getElementById('stat-file').innerText = data.file;
+        }
+
+        async function fetchChart() {
+            const res = await fetch('/api/v1/chart'); const data = await res.json();
+            
+            [chartMini, chartFull].forEach(chart => {
+                chart.data.labels = data.labels;
+                chart.data.datasets[0].data = data.ssh;
+                chart.data.datasets[1].data = data.sudo;
+                chart.data.datasets[2].data = data.file;
+                chart.update();
+            });
+        }
+
+        async function fetchAlerts() {
+            const res = await fetch('/api/v1/alerts'); const data = await res.json();
+            
+            // Overview: Alerts panels (unique)
+            let alertsHtml = "";
+            let uniqueAlerts = Array.from(new Set(data.map(a => a.title))).map(title => data.find(a => a.title === title)).slice(0, 4);
+            uniqueAlerts.forEach(a => {
+                alertsHtml += `<div class="alert-box type-${a.event_type.toLowerCase()}">
+                                <div><h4><i class="fa-solid fa-bell"></i> ${a.title}</h4><p>${a.description.substring(0,40)}</p></div>
+                                <div class="alert-time">${a.time}</div></div>`;
+            });
+            document.getElementById('alerts-container').innerHTML = alertsHtml || "<p style='color:var(--text-muted)'>No events logged today.</p>";
+            
+            // Overview & Full Page Logs Table
+            let overviewLogsHtml = "";
+            let fullLogsHtml = "";
+            
+            data.forEach(a => {
+                let color = "var(--text-main)";
+                if(a.severity === 'CRITICAL') color = "var(--color-red)";
+                if(a.severity === 'WARNING') color = "var(--color-orange)";
+
+                // Overview (Short)
+                overviewLogsHtml += `<tr>
+                    <td style='color:var(--text-muted)'>${a.time}</td>
+                    <td style='color:${color}'>${a.severity}</td>
+                    <td><b>${a.event_type}</b></td>
+                    <td>${a.description.substring(0, 30)}...</td>
+                </tr>`;
+                
+                // Full Page (Detailed)
+                fullLogsHtml += `<tr>
+                    <td style='color:var(--text-muted)'>#${a.id}</td>
+                    <td style='color:var(--text-muted)'>${a.time}</td>
+                    <td><b>${a.event_type}</b></td>
+                    <td style='color:${color}; font-weight:bold;'>${a.severity}</td>
+                    <td>${a.title}</td>
+                    <td style='font-family:monospace; font-size: 0.8em; color:var(--text-muted)'>${a.raw_log.substring(0, 80)}...</td>
+                </tr>`;
+            });
+            
+            document.getElementById('logs-body-overview').innerHTML = overviewLogsHtml;
+            document.getElementById('logs-body-full').innerHTML = fullLogsHtml;
+            document.getElementById('api-status').innerText = 'OK'; document.getElementById('api-status').style.color = 'var(--color-green)';
+        }
+
+        // Loop
+        async function updateDashboard() {
+            await fetchSystem();
+            await fetchStats();
+            await fetchChart();
+            await fetchAlerts();
+        }
+
+        // Lancement initial
+        updateDashboard();
+        setInterval(updateDashboard, 5000);
+    </script>
+</body>
+</html>

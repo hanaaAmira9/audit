@@ -1,0 +1,19 @@
+
+-w /etc/passwd -p wa -k identity
+-w /etc/shadow -p wa -k identity
+-w /etc/group -p wa -k identity
+
+
+-w /etc/sudoers -p wa -k scope
+
+
+-w /var/log/auth.log -p wa -k logins
+
+
+-w /usr/bin/sudo -p x -k priv_esc
+-w /bin/su -p x -k priv_esc
+
+
+-w /usr/bin/passwd -p x -k passwd_change
+
+#-a always,exit -F arch=b64 -S execve -k command_exec
