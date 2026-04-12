@@ -13,14 +13,11 @@ DB_PATH = "security_events.db"
 AUTH_LOG_PATH = "/var/log/auth.log"
 POLL_INTERVAL = 3
 
-# État simple en mémoire pour éviter de relire les mêmes logs
+
 state = {
     "auth_offset": 0,
 }
 
-# Accepte :
-# - Failed password for root from 192.168.1.10 port 22 ssh2
-# - Failed password for invalid user fakeuser from ::1 port 54922 ssh2
 SSH_FAILED_RE = re.compile(
     r"Failed password for (invalid user )?(?P<user>\S+) from (?P<ip>\S+)( port (?P<port>\d+))?( ssh2)?",
     re.IGNORECASE
