@@ -1,0 +1,161 @@
+\documentclass[10pt]{beamer}
+\usetheme{Madrid}
+\usecolortheme{default}
+\usepackage[utf8]{inputenc}
+\usepackage[T1]{fontenc}
+\usepackage[french]{babel}
+\usepackage{graphicx}
+\usepackage{listings}
+\usepackage{booktabs}
+\usepackage{xcolor}
+
+\definecolor{codegreen}{rgb}{0,0.6,0}
+\definecolor{codegray}{rgb}{0.5,0.5,0.5}
+\definecolor{codepurple}{rgb}{0.58,0,0.82}
+\definecolor{backcolour}{rgb}{0.95,0.95,0.92}
+
+\lstdefinestyle{mystyle}{
+    backgroundcolor=\color{backcolour},   
+    commentstyle=\color{codegreen},
+    keywordstyle=\color{magenta},
+    numberstyle=\tiny\color{codegray},
+    stringstyle=\color{codepurple},
+    basicstyle=\ttfamily\tiny,
+    breakatwhitespace=false,         
+    breaklines=true,                 
+    captionpos=b,                    
+    keepspaces=true,                 
+    showspaces=false,                
+    showstringspaces=false,
+    showtabs=false,                  
+    tabsize=2
+}
+\lstset{style=mystyle}
+
+\title[Système d'Audit et Journalisation]{Conception, Implémentation et Évaluation d'un Système d’Audit et de Supervision de Sécurité}
+\author[Taha H.A. \& Taha W.]{Taha Hanaa Amira \and Taha Wahiba}
+\institute[ING4 SECI]{ING4 SECI}
+\date{\today}
+
+\begin{document}
+
+\begin{frame}
+    \titlepage
+\end{frame}
+
+\begin{frame}{Sommaire}
+    \tableofcontents
+\end{frame}
+
+\section{Introduction}
+\begin{frame}{Introduction : Système d’Audit et de Journalisation sur OS}
+    \begin{itemize}
+        \item \textbf{La journalisation (Logging)} est une brique fondamentale pour garantir la sécurité et la traçabilité des opérations sur un système d'exploitation.
+        \item \textbf{L'audit système} va encore plus loin en surveillant directement les \textit{appels systèmes} et l'accès aux ressources sensibles.
+        \item Ces mécanismes constituent le \textbf{premier axe de défense} pour enquêter après un incident (Post-mortem) ou pour surveiller les menaces en temps réel.
+    \end{itemize}
+\end{frame}
+
+\section{Objectif}
+\begin{frame}{Objectif Principal}
+    L'objectif de ce projet est de :
+    \vspace{0.4cm}
+    \begin{block}{Mettre en place et exploiter un système de logs de sécurité}
+        Il s'agit de capter et traiter efficacement l'information pour \textbf{détecter les événements suspects sur Linux} (tentatives d'intrusion, usurpation de privilèges).
+    \end{block}
+    \vspace{0.4cm}
+    \begin{itemize}
+        \item Capturer nativement les traces liées à l'authentification et au comportement système.
+        \item Structurer et centraliser ces traces de façon lisible et pertinente.
+    \end{itemize}
+\end{frame}
+
+\section{Pourquoi choisir Linux ?}
+\begin{frame}{Pourquoi choisir Linux ?}
+    Le choix de cibler l'architecture GNU/Linux repose sur plusieurs facteurs :
+    \vspace{0.3cm}
+    \begin{itemize}
+        \item \textbf{Cible de choix :} Les serveurs Linux hébergent la majorité des infrastructures cloud critiques, les rendant naturellement propices aux attaques ciblées (Bruteforce, exploitation Web, priv-esc).
+        \item \textbf{Richesse des outils natifs :} Le système offre des mécanismes embarqués extrêmement puissants comme \texttt{/var/log/auth.log} pour les identités, et \texttt{auditd} agissant directement au niveau du noyau (syscalls).
+        \item \textbf{Transparence et flexibilité :} L'open-source permet d'interagir librement et profondément avec le système fonctionnel sans opacité logicielle.
+    \end{itemize}
+\end{frame}
+
+\section{Problématique}
+\begin{frame}{Problématique}
+    Malgré la puissance des journaux systèmes natifs sous Linux, le suivi de la sécurité se heurte à un obstacle majeur :
+    \vspace{0.3cm}
+    \begin{alertblock}{La difficulté d'analyse manuelle}
+        Les fichiers systèmes (\texttt{syslog}, \texttt{auth.log}) et les sorties brutes d'\texttt{auditd} sont \textbf{verbeux, bruts, dispersés et extrêmement chronophages} à exploiter à l'œil nu par un administrateur quotidiennement.
+    \end{alertblock}
+    \vspace{0.3cm}
+    \textbf{Question au centre de notre étude : }\\
+    \textit{Comment concevoir une solution logicielle, autonome et légère, qui centralise, structure et identifie les événements malveillants réels parmi cette masse de journaux ?}
+\end{frame}
+
+\section{Implémentation}
+\begin{frame}[fragile]{Implémentation de la Solution}
+    La solution déployée utilise une approche hybride (Python/Bash) :
+    \vspace{0.3cm}
+    \begin{enumerate}
+        \item \textbf{Configuration noyau (\texttt{auditd}) :} 
+        Mise en place de règles de surveillance strictes sur les paramètres d'identité du système.
+        \begin{lstlisting}[language=bash]
+-w /etc/passwd -p wa -k identity
+-w /etc/shadow -p wa -k identity\end{lstlisting}
+        \item \textbf{Collecte de journaux (\texttt{auth.log}) :}
+        Traitement des logs SSH (\textit{Failed password}) et de commande (\textit{sudo}).
+        \item \textbf{Traitement Local (Python) :} L'application tourne avec les privilèges via les appels bash réguliers (ex: \texttt{ausearch}) et parse les résultats.
+        \item \textbf{Interface Web Flask :} Restitution des éléments qualifiés dans un Dashboard relié à une base locale structurée en \texttt{SQLite}.
+    \end{enumerate}
+\end{frame}
+
+\section{Résultats}
+\begin{frame}{Résultats obtenus}
+    L’exécution conjointe de notre programme Web et du script malveillant de test (\texttt{simulate\_attacks.sh}) a permis de confirmer la faisabilité et l'efficience de l'approche :
+    \vspace{0.3cm}
+    \begin{itemize}
+        \item \textbf{Détection immédiate} : Les attaques simulées (Bruteforce, Élévation via sudo, Accès ou manipulations des identités) remontent à 100\%.
+        \item \textbf{Classement par priorité} : Les logs de texte plats sont transformés en événements normés (catégories \texttt{SSH}, \texttt{ROOT}, \texttt{SUDO}, \texttt{FILE}).
+        \item \textbf{Visualisation claire} : Le Dashboard de sécurité garantit une vue "Control Room" simplifiée en comparaison aux consoles complexes.
+    \end{itemize}
+\end{frame}
+
+\section{Limites et Perspectives}
+\begin{frame}{Limites et Perspectives}
+    \begin{block}{Limites}
+        \begin{itemize}
+            \item \textbf{Stockage local vulnérable : } En cas de compromission Totale, la base SQLite locale de logs pourrait être détruite.
+            \item \textbf{Surveillance passive : } L'outil alerte mais n'interrompt pas activement l'attaquant.
+        \end{itemize}
+    \end{block}
+    \vspace{0.2cm}
+    \begin{block}{Perspectives}
+        \begin{itemize}
+            \item Intégration de \textbf{Fail2ban} pour ajouter une couche de prévention (blocage d'IP automatisé via \textit{iptables}).
+            \item Externalisation de la base (ex: \textbf{PostgreSQL}) vers un autre serveur pour renforcer la disponibilité et l'intégrité de la traçabilité en cas d'attaque lourde.
+        \end{itemize}
+    \end{block}
+\end{frame}
+
+\section{Conclusion}
+\begin{frame}{Conclusion Générale}
+    En conclusion, ce projet a permis de démontrer plusieurs points essentiels :
+    \vspace{0.3cm}
+    \begin{itemize}
+        \item \textbf{Viabilité des solutions intégrées :} Il est tout à fait possible de bâtir un système fonctionnel de détection d'intrusions (HIDS) à partir des mécanismes natifs et gratuits de l'OS.
+        \item \textbf{La force de corrélation :} Interroger simultanément l'audit noyau (\texttt{auditd}) et l'authentification réseau (\texttt{auth.log}) offre un maillage complet de surveillance (fichiers \& accès).
+        \item \textbf{Ergonomie opérationnelle :} En passant de la ligne de commande brute à un tableau de bord analytique, la réduction du temps de réponse face à un incident de sécurité est considérable.
+    \end{itemize}
+\end{frame}
+
+\begin{frame}
+    \centering
+    \Huge \textbf{Merci de votre attention !}\\
+    \vspace{1cm}
+    \Large \textbf{Avez-vous des questions ?}\\
+    \vspace{1cm}
+    \normalsize Projet : \textit{Système d'Audit et de Journalisation de Sécurité Linux}
+\end{frame}
+
+\end{document}
